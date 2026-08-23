@@ -1,0 +1,6 @@
+/git-hotspots
+/bin/
+*.exe
+*.test
+*.out
+.DS_Store
