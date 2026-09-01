@@ -29,6 +29,7 @@ func collectStats(repoDir, since, pathspec string) (map[string]*FileStat, error)
 		"-C", repoDir,
 		"log",
 		"--no-merges",
+		"-M",
 		"--numstat",
 		"--pretty=format:" + commitMarker + "%H",
 	}
@@ -51,8 +52,14 @@ func collectStats(repoDir, since, pathspec string) (map[string]*FileStat, error)
 		return nil, err
 	}
 
+	// stats is keyed by every path name a file has ever been known by, so a
+	// lookup under either its old or new name (after a rename) lands on the
+	// same *FileStat. Since git log walks newest-first, by the time we see a
+	// commit that renamed old -> new, "new" is already the row's Path (it's
+	// the name closer to HEAD); we then alias "old" to that same row so
+	// older commits mentioning "old" keep accumulating into it.
 	stats := make(map[string]*FileStat)
-	seenInCommit := make(map[string]bool)
+	seenInCommit := make(map[*FileStat]bool)
 
 	scanner := bufio.NewScanner(out)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -62,7 +69,7 @@ func collectStats(repoDir, since, pathspec string) (map[string]*FileStat, error)
 			continue
 		}
 		if strings.HasPrefix(line, commitMarker) {
-			seenInCommit = make(map[string]bool)
+			seenInCommit = make(map[*FileStat]bool)
 			continue
 		}
 
@@ -70,19 +77,24 @@ func collectStats(repoDir, since, pathspec string) (map[string]*FileStat, error)
 		if len(fields) != 3 {
 			continue
 		}
-		path := fields[2]
-		if seenInCommit[path] {
+		oldPath, newPath, renamed := splitRenamePath(fields[2])
+
+		fs, ok := stats[newPath]
+		if !ok {
+			fs = &FileStat{Path: newPath}
+			stats[newPath] = fs
+		}
+		if renamed {
+			stats[oldPath] = fs
+		}
+
+		if seenInCommit[fs] {
 			// A commit can list the same path twice for merge conflicts
 			// resolved oddly; only count it once per commit.
 			continue
 		}
-		seenInCommit[path] = true
+		seenInCommit[fs] = true
 
-		fs, ok := stats[path]
-		if !ok {
-			fs = &FileStat{Path: path}
-			stats[path] = fs
-		}
 		fs.Commits++
 		fs.Added += parseNumstatField(fields[0])
 		fs.Deleted += parseNumstatField(fields[1])
@@ -100,6 +112,32 @@ func collectStats(repoDir, since, pathspec string) (map[string]*FileStat, error)
 	}
 
 	return stats, nil
+}
+
+// splitRenamePath takes the third numstat field and, if it describes a
+// rename, returns the old and new paths with renamed set to true. With -M
+// enabled git prints renames two ways: as a full "old/path.go => new/path.go"
+// when nothing in the path is shared, or with the common prefix/suffix
+// factored out as "shared/{old => new}/path.go" when only part of it
+// changed. Anything else is returned unchanged with renamed set to false.
+func splitRenamePath(s string) (oldPath, newPath string, renamed bool) {
+	if open := strings.Index(s, "{"); open != -1 {
+		end := strings.Index(s[open:], "}")
+		if end == -1 {
+			return s, s, false
+		}
+		end += open
+		parts := strings.SplitN(s[open+1:end], " => ", 2)
+		if len(parts) != 2 {
+			return s, s, false
+		}
+		prefix, suffix := s[:open], s[end+1:]
+		return prefix + parts[0] + suffix, prefix + parts[1] + suffix, true
+	}
+	if parts := strings.SplitN(s, " => ", 2); len(parts) == 2 {
+		return parts[0], parts[1], true
+	}
+	return s, s, false
 }
 
 // parseNumstatField turns a numstat count into an int. Binary files report

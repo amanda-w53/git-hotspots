@@ -73,9 +73,12 @@ For every non-merge commit, `git-hotspots` reads the numstat lines (added
 lines, deleted lines, path) and increments a per-file commit counter once
 per commit, plus running totals of lines added and deleted. Binary files
 show up with a commit count but zero line counts, since git doesn't report
-line diffs for them. Renames are currently tracked as the raw `old => new`
-string git prints, not merged into either the old or new path — that's the
-main thing on the list to fix next.
+line diffs for them.
+
+Rename detection is on (`-M`), and a renamed file's history before and
+after the move is merged into a single row under its current path, instead
+of splitting into an "old" row and a "new" row that both undercount how
+often the file actually changes.
 
 ## License
 
