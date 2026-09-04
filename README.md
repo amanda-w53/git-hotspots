@@ -37,6 +37,7 @@ Narrow it down by time or by path:
 ```
 git-hotspots -since "6 months ago" -limit 10
 git-hotspots -path src/api -since "1 year ago"
+git-hotspots -author "jane@" -since "3 months ago"
 ```
 
 Get JSON for scripting or feeding into another tool:
@@ -64,6 +65,7 @@ git-hotspots -json -limit 5
 | `-repo`    | `.`     | Path to the git repository                           |
 | `-since`   | (none)  | Only count commits after this date, e.g. `"3 months ago"` |
 | `-path`    | (none)  | Restrict to commits touching this pathspec           |
+| `-author`  | (none)  | Restrict to commits by an author matching this pattern (regex, matched against name and email) |
 | `-limit`   | `20`    | Number of files to print                             |
 | `-json`    | `false` | Print JSON instead of a table                        |
 

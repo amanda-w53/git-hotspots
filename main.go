@@ -23,6 +23,7 @@ func main() {
 	repoDir := flag.String("repo", ".", "path to the git repository")
 	since := flag.String("since", "", `only consider commits after this date (anything "git log --since" accepts, e.g. "6 months ago")`)
 	pathspec := flag.String("path", "", "limit to commits touching this path (a git pathspec)")
+	author := flag.String("author", "", "only consider commits by an author matching this pattern (regex, matched against name and email)")
 	limit := flag.Int("limit", 20, "number of files to show")
 	jsonOut := flag.Bool("json", false, "print machine-readable JSON instead of a table")
 	flag.Usage = func() {
@@ -37,7 +38,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	stats, err := collectStats(*repoDir, *since, *pathspec)
+	stats, err := collectStats(*repoDir, *since, *pathspec, *author)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "git-hotspots: %v\n", err)
 		os.Exit(1)

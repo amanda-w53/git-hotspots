@@ -23,8 +23,10 @@ type FileStat struct {
 }
 
 // collectStats runs `git log --numstat` in repoDir and aggregates per-file
-// change counts across the matching commits.
-func collectStats(repoDir, since, pathspec string) (map[string]*FileStat, error) {
+// change counts across the matching commits. author, if non-empty, is
+// passed straight through to git's --author, which matches as a regex
+// against the commit's author name and email.
+func collectStats(repoDir, since, pathspec, author string) (map[string]*FileStat, error) {
 	args := []string{
 		"-C", repoDir,
 		"log",
@@ -35,6 +37,9 @@ func collectStats(repoDir, since, pathspec string) (map[string]*FileStat, error)
 	}
 	if since != "" {
 		args = append(args, "--since="+since)
+	}
+	if author != "" {
+		args = append(args, "--author="+author)
 	}
 	if pathspec != "" {
 		args = append(args, "--", pathspec)
