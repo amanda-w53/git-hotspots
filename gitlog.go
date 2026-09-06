@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -57,6 +58,28 @@ func collectStats(repoDir, since, pathspec, author string) (map[string]*FileStat
 		return nil, err
 	}
 
+	stats, err := parseNumstatLog(out)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := cmd.Wait(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg != "" {
+			return nil, fmt.Errorf("git log: %s", msg)
+		}
+		return nil, fmt.Errorf("git log: %w", err)
+	}
+
+	return stats, nil
+}
+
+// parseNumstatLog reads the output of `git log --numstat
+// --pretty=format:<commitMarker>%H` (as produced by collectStats) and
+// aggregates per-file change counts. Split out from collectStats so it can
+// be exercised directly against a fixture log in tests, without needing a
+// real git repository on disk.
+func parseNumstatLog(r io.Reader) (map[string]*FileStat, error) {
 	// stats is keyed by every path name a file has ever been known by, so a
 	// lookup under either its old or new name (after a rename) lands on the
 	// same *FileStat. Since git log walks newest-first, by the time we see a
@@ -66,7 +89,7 @@ func collectStats(repoDir, since, pathspec, author string) (map[string]*FileStat
 	stats := make(map[string]*FileStat)
 	seenInCommit := make(map[*FileStat]bool)
 
-	scanner := bufio.NewScanner(out)
+	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -106,14 +129,6 @@ func collectStats(repoDir, since, pathspec, author string) (map[string]*FileStat
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
-	}
-
-	if err := cmd.Wait(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg != "" {
-			return nil, fmt.Errorf("git log: %s", msg)
-		}
-		return nil, fmt.Errorf("git log: %w", err)
 	}
 
 	return stats, nil
