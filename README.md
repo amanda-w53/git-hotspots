@@ -40,6 +40,12 @@ git-hotspots -path src/api -since "1 year ago"
 git-hotspots -author "jane@" -since "3 months ago"
 ```
 
+Rank by lines changed instead of commit count:
+
+```
+git-hotspots -sort churn -limit 10
+```
+
 Get JSON for scripting or feeding into another tool:
 
 ```
@@ -68,6 +74,7 @@ git-hotspots -json -limit 5
 | `-author`  | (none)  | Restrict to commits by an author matching this pattern (regex, matched against name and email) |
 | `-limit`   | `20`    | Number of files to print                             |
 | `-json`    | `false` | Print JSON instead of a table                        |
+| `-sort`    | `commits` | Rank by `commits` or by `churn` (added + deleted lines) |
 
 ## How it counts
 

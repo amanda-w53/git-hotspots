@@ -26,6 +26,7 @@ func main() {
 	author := flag.String("author", "", "only consider commits by an author matching this pattern (regex, matched against name and email)")
 	limit := flag.Int("limit", 20, "number of files to show")
 	jsonOut := flag.Bool("json", false, "print machine-readable JSON instead of a table")
+	sortBy := flag.String("sort", "commits", `how to rank files: "commits" or "churn" (added+deleted lines)`)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "git-hotspots: find the most frequently changed files in a git repo\n\n")
 		fmt.Fprintf(os.Stderr, "usage: %s [flags]\n\n", os.Args[0])
@@ -35,6 +36,10 @@ func main() {
 
 	if *limit <= 0 {
 		fmt.Fprintln(os.Stderr, "git-hotspots: -limit must be positive")
+		os.Exit(2)
+	}
+	if *sortBy != "commits" && *sortBy != "churn" {
+		fmt.Fprintf(os.Stderr, "git-hotspots: -sort must be \"commits\" or \"churn\", got %q\n", *sortBy)
 		os.Exit(2)
 	}
 
@@ -49,9 +54,14 @@ func main() {
 		rows = append(rows, fs)
 	}
 	sort.Slice(rows, func(i, j int) bool {
-		ci, cj := rows[i].Commits, rows[j].Commits
-		if ci != cj {
-			return ci > cj
+		var vi, vj int
+		if *sortBy == "churn" {
+			vi, vj = rows[i].Added+rows[i].Deleted, rows[j].Added+rows[j].Deleted
+		} else {
+			vi, vj = rows[i].Commits, rows[j].Commits
+		}
+		if vi != vj {
+			return vi > vj
 		}
 		return rows[i].Path < rows[j].Path
 	})
