@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 )
 
 type jsonRow struct {
@@ -27,6 +28,7 @@ func main() {
 	limit := flag.Int("limit", 20, "number of files to show")
 	jsonOut := flag.Bool("json", false, "print machine-readable JSON instead of a table")
 	sortBy := flag.String("sort", "commits", `how to rank files: "commits" or "churn" (added+deleted lines)`)
+	exclude := flag.String("exclude", "", `comma-separated glob patterns of paths to drop, e.g. "vendor/*,*.pb.go,generated"`)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "git-hotspots: find the most frequently changed files in a git repo\n\n")
 		fmt.Fprintf(os.Stderr, "usage: %s [flags]\n\n", os.Args[0])
@@ -43,7 +45,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	stats, err := collectStats(*repoDir, *since, *pathspec, *author)
+	stats, err := collectStats(*repoDir, *since, *pathspec, *author, splitExclude(*exclude))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "git-hotspots: %v\n", err)
 		os.Exit(1)
@@ -74,6 +76,22 @@ func main() {
 		return
 	}
 	printTable(rows)
+}
+
+// splitExclude turns a comma-separated -exclude value into a pattern list,
+// dropping blanks so a trailing comma or double comma doesn't produce a
+// pattern that matches everything.
+func splitExclude(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var patterns []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			patterns = append(patterns, p)
+		}
+	}
+	return patterns
 }
 
 func printJSON(rows []*FileStat) {

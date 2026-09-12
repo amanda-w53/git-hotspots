@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -26,8 +27,10 @@ type FileStat struct {
 // collectStats runs `git log --numstat` in repoDir and aggregates per-file
 // change counts across the matching commits. author, if non-empty, is
 // passed straight through to git's --author, which matches as a regex
-// against the commit's author name and email.
-func collectStats(repoDir, since, pathspec, author string) (map[string]*FileStat, error) {
+// against the commit's author name and email. exclude holds glob patterns
+// (see matchesExclude) for paths to drop from the results entirely, such as
+// vendored or generated code.
+func collectStats(repoDir, since, pathspec, author string, exclude []string) (map[string]*FileStat, error) {
 	args := []string{
 		"-C", repoDir,
 		"log",
@@ -58,7 +61,7 @@ func collectStats(repoDir, since, pathspec, author string) (map[string]*FileStat
 		return nil, err
 	}
 
-	stats, err := parseNumstatLog(out)
+	stats, err := parseNumstatLog(out, exclude)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +79,10 @@ func collectStats(repoDir, since, pathspec, author string) (map[string]*FileStat
 
 // parseNumstatLog reads the output of `git log --numstat
 // --pretty=format:<commitMarker>%H` (as produced by collectStats) and
-// aggregates per-file change counts. Split out from collectStats so it can
-// be exercised directly against a fixture log in tests, without needing a
-// real git repository on disk.
-func parseNumstatLog(r io.Reader) (map[string]*FileStat, error) {
+// aggregates per-file change counts, dropping any path matched by exclude.
+// Split out from collectStats so it can be exercised directly against a
+// fixture log in tests, without needing a real git repository on disk.
+func parseNumstatLog(r io.Reader, exclude []string) (map[string]*FileStat, error) {
 	// stats is keyed by every path name a file has ever been known by, so a
 	// lookup under either its old or new name (after a rename) lands on the
 	// same *FileStat. Since git log walks newest-first, by the time we see a
@@ -106,6 +109,11 @@ func parseNumstatLog(r io.Reader) (map[string]*FileStat, error) {
 			continue
 		}
 		oldPath, newPath, renamed := splitRenamePath(fields[2])
+		// A file is excluded (or not) based on where it lives now, matching
+		// the same "current path wins" rule used for merging rename history.
+		if matchesExclude(newPath, exclude) {
+			continue
+		}
 
 		fs, ok := stats[newPath]
 		if !ok {
@@ -158,6 +166,37 @@ func splitRenamePath(s string) (oldPath, newPath string, renamed bool) {
 		return parts[0], parts[1], true
 	}
 	return s, s, false
+}
+
+// matchesExclude reports whether path should be dropped based on patterns
+// (as given to -exclude). A pattern with no "/" is matched against every
+// path component, so "vendor" or "*.pb.go" exclude a directory or a file
+// extension wherever it appears in the tree. A pattern ending in "/*" also
+// matches everything below that directory, not just its direct children
+// (path/filepath.Match's "*" alone stops at the next "/", which would miss
+// vendor/pkg/sub/file.go for a pattern like "vendor/*"). Any other pattern
+// containing "/" is matched against the full path with path/filepath.Match.
+func matchesExclude(path string, patterns []string) bool {
+	for _, pat := range patterns {
+		if pat == "" {
+			continue
+		}
+		if !strings.Contains(pat, "/") {
+			for _, part := range strings.Split(path, "/") {
+				if ok, _ := filepath.Match(pat, part); ok {
+					return true
+				}
+			}
+			continue
+		}
+		if dir := strings.TrimSuffix(pat, "/*"); dir != pat && strings.HasPrefix(path, dir+"/") {
+			return true
+		}
+		if ok, _ := filepath.Match(pat, path); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // parseNumstatField turns a numstat count into an int. Binary files report

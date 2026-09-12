@@ -46,6 +46,12 @@ Rank by lines changed instead of commit count:
 git-hotspots -sort churn -limit 10
 ```
 
+Keep vendored or generated code out of the ranking:
+
+```
+git-hotspots -exclude "vendor/*,*.pb.go,generated"
+```
+
 Get JSON for scripting or feeding into another tool:
 
 ```
@@ -75,6 +81,7 @@ git-hotspots -json -limit 5
 | `-limit`   | `20`    | Number of files to print                             |
 | `-json`    | `false` | Print JSON instead of a table                        |
 | `-sort`    | `commits` | Rank by `commits` or by `churn` (added + deleted lines) |
+| `-exclude` | (none)  | Comma-separated glob patterns of paths to drop, e.g. `vendor/*,*.pb.go,generated` |
 
 ## How it counts
 
@@ -88,6 +95,13 @@ Rename detection is on (`-M`), and a renamed file's history before and
 after the move is merged into a single row under its current path, instead
 of splitting into an "old" row and a "new" row that both undercount how
 often the file actually changes.
+
+`-exclude` patterns without a `/` (like `vendor` or `*.pb.go`) are checked
+against every path component, so they match a directory or file extension
+no matter how deep it is. A pattern ending in `/*` (like `vendor/*`) matches
+everything under that directory, not just its direct children. A renamed
+file is excluded (or not) based on where it lives now, matching how rename
+history is merged.
 
 ## License
 

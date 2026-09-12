@@ -30,7 +30,7 @@ const fixtureLog = `@@commit@@c4
 `
 
 func TestParseNumstatLog(t *testing.T) {
-	stats, err := parseNumstatLog(strings.NewReader(fixtureLog))
+	stats, err := parseNumstatLog(strings.NewReader(fixtureLog), nil)
 	if err != nil {
 		t.Fatalf("parseNumstatLog: %v", err)
 	}
@@ -74,6 +74,42 @@ func TestParseNumstatLog(t *testing.T) {
 	}
 	if logo.Added != 0 || logo.Deleted != 0 {
 		t.Errorf("logo.png Added/Deleted = %d/%d, want 0/0 for a binary file", logo.Added, logo.Deleted)
+	}
+}
+
+func TestParseNumstatLogExclude(t *testing.T) {
+	stats, err := parseNumstatLog(strings.NewReader(fixtureLog), []string{"assets/*"})
+	if err != nil {
+		t.Fatalf("parseNumstatLog: %v", err)
+	}
+	if _, ok := stats["assets/logo.png"]; ok {
+		t.Errorf("expected %q to be excluded, but it was present", "assets/logo.png")
+	}
+	if _, ok := stats["src/main.go"]; !ok {
+		t.Errorf("expected %q to remain, exclude pattern should not have matched it", "src/main.go")
+	}
+}
+
+func TestMatchesExclude(t *testing.T) {
+	cases := []struct {
+		path     string
+		patterns []string
+		want     bool
+	}{
+		{"vendor/lib/thing.go", []string{"vendor"}, true},
+		{"src/vendored.go", []string{"vendor"}, false},
+		{"vendor/lib/thing.go", []string{"vendor/*"}, true},
+		{"vendor/lib/deep/thing.go", []string{"vendor/*"}, true},
+		{"gen/api.pb.go", []string{"*.pb.go"}, true},
+		{"gen/api.go", []string{"*.pb.go"}, false},
+		{"internal/generated/api.go", []string{"generated"}, true},
+		{"src/main.go", []string{"vendor", "*.pb.go"}, false},
+		{"src/main.go", nil, false},
+	}
+	for _, c := range cases {
+		if got := matchesExclude(c.path, c.patterns); got != c.want {
+			t.Errorf("matchesExclude(%q, %v) = %v, want %v", c.path, c.patterns, got, c.want)
+		}
 	}
 }
 
