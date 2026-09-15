@@ -14,8 +14,11 @@ point it at and summarizes the output.
 ## Build
 
 ```
-go build -o git-hotspots .
+make build
 ```
+
+or run the plain `go build -o git-hotspots .` yourself. `make release` cross-compiles
+binaries for linux, darwin, and windows (amd64 and arm64) into `dist/`.
 
 ## Usage
 

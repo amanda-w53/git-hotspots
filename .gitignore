@@ -1,5 +1,6 @@
 /git-hotspots
 /bin/
+/dist/
 *.exe
 *.test
 *.out
