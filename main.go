@@ -20,7 +20,12 @@ type jsonRow struct {
 	Churn   int    `json:"churn"`
 }
 
+// version is set at build time via -ldflags "-X main.version=...". Left as
+// "dev" for a plain `go build` outside of the Makefile.
+var version = "dev"
+
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
 	repoDir := flag.String("repo", ".", "path to the git repository")
 	since := flag.String("since", "", `only consider commits after this date (anything "git log --since" accepts, e.g. "6 months ago")`)
 	pathspec := flag.String("path", "", "limit to commits touching this path (a git pathspec)")
@@ -35,6 +40,11 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	if *limit <= 0 {
 		fmt.Fprintln(os.Stderr, "git-hotspots: -limit must be positive")

@@ -85,6 +85,11 @@ git-hotspots -json -limit 5
 | `-json`    | `false` | Print JSON instead of a table                        |
 | `-sort`    | `commits` | Rank by `commits` or by `churn` (added + deleted lines) |
 | `-exclude` | (none)  | Comma-separated glob patterns of paths to drop, e.g. `vendor/*,*.pb.go,generated` |
+| `-version` | `false` | Print the version and exit                          |
+
+`make build` and `make release` bake the version into the binary from
+`git describe --tags`, so `git-hotspots -version` reports the tag (or
+`dev` if there's no tag yet). A plain `go build` leaves it as `dev`.
 
 ## How it counts
 
