@@ -19,6 +19,8 @@ make build
 
 or run the plain `go build -o git-hotspots .` yourself. `make release` cross-compiles
 binaries for linux, darwin, and windows (amd64 and arm64) into `dist/`.
+`make install` builds and copies the binary to `$(go env GOPATH)/bin`, so it
+ends up on `PATH` if that directory already is (most Go setups add it).
 
 ## Usage
 

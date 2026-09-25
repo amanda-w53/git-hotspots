@@ -6,11 +6,15 @@ DIST   := dist
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
+# `go env GOPATH` reports the default (~/go) even when the GOPATH env var
+# isn't set, so this works whether or not the caller has it exported.
+GOPATH  := $(shell go env GOPATH)
+
 # Cross-compile targets for `make release`. Windows binaries need the .exe
 # suffix or the file just won't run there.
 PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 
-.PHONY: build test clean release $(PLATFORMS)
+.PHONY: build test clean release install $(PLATFORMS)
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
@@ -20,6 +24,10 @@ test:
 
 clean:
 	rm -rf $(BINARY) $(DIST)
+
+install: build
+	mkdir -p $(GOPATH)/bin
+	cp $(BINARY) $(GOPATH)/bin/$(BINARY)
 
 release: $(PLATFORMS)
 
